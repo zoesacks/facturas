@@ -14,7 +14,6 @@ class codigoFinancieroAdmin(ImportExportModelAdmin):
 
 
 class FacturaResource(resources.ModelResource):
-        
         emision = fields.Field(attribute='emision',  column_name='emision')
         alta = fields.Field(attribute='alta', column_name='alta')
         codigo = fields.Field(attribute='codigo', column_name='codigo', widget=widgets.ForeignKeyWidget(codigoFinanciero, 'codigo')) # Acceso al campo 'codigo' en codigoFinanciero
@@ -30,7 +29,6 @@ class FacturaResource(resources.ModelResource):
         class Meta:
                 model = factura
 
-
 def enviar(modeladmin, request, queryset):
     queryset.update(estado='enviado')
 
@@ -43,14 +41,21 @@ class facturaAdmin(ImportExportModelAdmin):
         list_filter = ('nroFactura', 'proveedor',)
         actions = [enviar]
 
-
+        #filtrar por tipo de usuario
         def get_queryset(self, request):
                 user = request.user
-                user_group_name = user.groups.first().name if user.groups.exists() else None
                 queryset = super().get_queryset(request)
 
-                if user_group_name:
-                        queryset = queryset.filter(codigo__codigo=user_group_name, estado = 'enviar')
+                #los de admin solo pueden ver lo enviado
+                if user.groups.filter(name="administracion").exists():
+                        queryset = queryset.filter(estado='enviado')
+
+                else:
+                        user_group_name = user.groups.first().name if user.groups.exists() else None
+
+                        #los demas lo que esta para enviar
+                        if user_group_name:
+                                queryset = queryset.filter(codigo__codigo=user_group_name, estado = 'enviar')
 
                 return queryset
  
