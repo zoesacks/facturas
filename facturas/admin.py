@@ -1,5 +1,7 @@
 from django.contrib import admin
+from django.db import models
 from .models import factura, codigoFinanciero
+from django.db.models import Sum
 from import_export.admin import ImportExportModelAdmin
 from import_export import resources, fields, widgets
 
@@ -12,8 +14,8 @@ admin.site.site_title = "Gestion Pilar"
 class codigoFinancieroAdmin(ImportExportModelAdmin):
         list_display= ('codigo',)
 
-
-class FacturaResource(resources.ModelResource):
+#controlo como se importa/exporta
+class facturaResource(resources.ModelResource):
         emision = fields.Field(attribute='emision',  column_name='emision')
         alta = fields.Field(attribute='alta', column_name='alta')
         codigo = fields.Field(attribute='codigo', column_name='codigo', widget=widgets.ForeignKeyWidget(codigoFinanciero, 'codigo')) # Acceso al campo 'codigo' en codigoFinanciero
@@ -29,20 +31,42 @@ class FacturaResource(resources.ModelResource):
         class Meta:
                 model = factura
 
+
 def enviar(modeladmin, request, queryset):
     queryset.update(estado='enviado')
 
-enviar.short_description = "Marcar seleccionadas como Enviadas"
+enviar.short_description = "Enviar"
 
 @admin.register(factura)
 class facturaAdmin(ImportExportModelAdmin):
-        resource_class = FacturaResource
-        list_display=('codigo','estado', 'emision', 'nroFactura', 'proveedor', 'total', 'objeto')
-        list_filter = ('nroFactura', 'proveedor',)
+        resource_class = facturaResource
         actions = [enviar]
 
-        #filtrar por tipo de usuario
+        #controlo los filtros segun el grupo
+        def get_list_filter(self, request):
+                user = request.user
+                list_filter = ('nroFactura', 'proveedor',)
+
+                if user.groups.filter(name="administracion").exists():
+                         list_filter += ('codigo',) 
+
+                exclude = ('codigo',)
+                return list_filter
+
+        #controlo lo que ve en el cuadro segun el grupo
+        def get_list_display(self, request):
+                user = request.user
+                common_display = ['nroFactura', 'proveedor', 'total']
+                
+                if user.groups.filter(name="administracion").exists():
+                        return ['codigo'] + common_display 
+                
+                return common_display
+        
+
+        #filtr el query por grupo
         def get_queryset(self, request):
+
                 user = request.user
                 queryset = super().get_queryset(request)
 
@@ -58,4 +82,5 @@ class facturaAdmin(ImportExportModelAdmin):
                                 queryset = queryset.filter(codigo__codigo=user_group_name, estado = 'enviar')
 
                 return queryset
+        
  
